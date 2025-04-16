@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html class="mcss">
+<head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+   <meta http-equiv="refresh" content="300">
+   <link rel="stylesheet" href="midas.css">
+   <script src="controls.js"></script>
+   <script src="jquery.min.js"></script>
+   <script src="midas.js"></script>
+   <script src="mhttpd.js"></script>
+   <title>Liquifier Production Rate</title>
+   <style>
+        column1 {
+            float: left;
+            padding: 5px;
+        }
+   </style>
+
+    <script>
+        function update() {
+            document.getElementById('rates_figure').src = "liquid_production/liquid_prod_rate_fig.html?random="+new Date().getTime();
+        }
+    </script>
+
+</head>
+
+<body class="mcss" onload="mhttpd_init('LiquidProdRate'); update()">
+
+    <!-- header and side navigation will be filled in mhttpd_start -->
+    <div id="mheader"></div>
+    <div id="msidenav"></div>
+    <div id="mmain">
+        <iframe id="rates_figure" src="" height=650px width=950px border=0></iframe>
+        </br>
+        This figure updated every 5 mins
+    </div>
+</body>
+</html>
