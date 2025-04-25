@@ -142,7 +142,7 @@
             if(start_var !== "custom"){
                 start_var *= 1000*60*60;
 
-                let start_date = new Date();
+                let start_date = new Date(document.getElementById("tend").value);
                 start_date = new Date(start_date.getTime() - start_var);
 
                 year = start_date.getFullYear();
@@ -167,21 +167,23 @@
 
             for(let i=0; i<input_ids.length; i++){
                 let inpt = document.getElementById(input_ids[i]);
-                inpt.addEventListener("keydown", function (e) {
-                        //checks whether the pressed key is "Enter"
-                        if (e.code === "Enter" || e.code === "NumpadEnter") {
-                            update_figure();
-                        }
-                    }
-                );
+                inpt.addEventListener("keydown", callback_return)
             }
         }
 
-        function set_custom_on_date_change(){
+        function callback_return(event){
+            //checks whether the pressed key is "Enter"
+            if (event.code === "Enter" || event.code === "NumpadEnter") {
+                update_figure();
+            }
+        }
+
+        function callback_tstart(){
             // click custom when the start date is changed
             document.getElementById("start_radio_custom").checked = true;
         }
-        function set_now_on_date_change(){
+
+        function callback_tend(){
             // unclick click Now checkbox when the end date is changed
             document.getElementById("tend_now").checked = false;
         }
@@ -203,7 +205,7 @@
         <table>
             <tr>
                 <td>Start date:</td>
-                <td><input type="datetime-local" id="tstart" onclick="set_custom_on_date_change();"></td>
+                <td><input type="datetime-local" id="tstart" onclick="callback_tstart();"></td>
                 <td><label><input type="radio" name="start_radio" id="start_radio_168" onclick="update_times();update_figure();" value=168> 7d</label>
                     <label><input type="radio" name="start_radio" id="start_radio_72" onclick="update_times();update_figure();" value=72> 3d</label>
                     <label><input type="radio" name="start_radio" id="start_radio_24" onclick="update_times();update_figure();" value=24> 24h</label>
@@ -215,7 +217,7 @@
             </tr>
             <tr>
                 <td>End date:</td>
-                <td><input type="datetime-local" id="tend" onclick="set_now_on_date_change();"></td>
+                <td><input type="datetime-local" id="tend" onclick="callback_tend();update_times();"></td>
                 <td><label><input type="checkbox" id="tend_now" checked> Now</label></td>
             </tr>
             <tr>
