@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html class="mcss">
+<html class="mcss" lang="en">
 <head>
    <meta charset="UTF-8">
-   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-   <meta http-equiv="refresh" content="300">
+   <!-- <meta name="viewport" content="width=device-width, initial-scale=1.0" /> -->
+   <!-- <meta http-equiv="refresh" content="300"> -->
    <link rel="stylesheet" href="midas.css">
    <script src="controls.js"></script>
    <script src="jquery.min.js"></script>
@@ -15,25 +15,220 @@
             float: left;
             padding: 5px;
         }
+
+        .loader {
+            border: 16px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 16px solid #3498db;
+            width: 120px;
+            height: 120px;
+            -webkit-animation: spin 2s linear infinite; /* Safari */
+            animation: spin 2s linear infinite;
+            padding: 10px;
+        }
+
+        /* Safari */
+        @-webkit-keyframes spin {
+            0% { -webkit-transform: rotate(0deg); }
+            100% { -webkit-transform: rotate(360deg); }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
    </style>
 
     <script>
-        function update() {
-            document.getElementById('rates_figure').src = "liquid_production/liquid_prod_rate_fig.html?random="+new Date().getTime();
+
+        function parse_rpc_response(rpc_result) {
+        // Convert an RPC result into a status code and message string.
+        // In the python code we specify a flag that means the main
+        // rpc_result.status is always 1 if the python code ran, and the
+        // "real" status code is embedded in the reply string.
+        //
+        // See the notes in midas.client.MidasClient.register_jrpc_callback()
+        // for the rationale.
+        let status = rpc_result.status;
+        let reply = "";
+
+        if (status == 1) {
+            // Only get a reply from mjsonrpc if status is 1
+            let parsed = JSON.parse(rpc_result.reply);
+            status = parsed["code"];
+            reply = parsed["msg"];
+        }
+
+        return [status, reply];
+        }
+
+        function alert_rpc_error(status, reply) {
+            // Give the user a nicer message if the error code is 103 (meaning that
+            // the requested client wasn't found). dlgAlert comes from controls.js.
+            if (status == 103) {
+                dlgAlert("The liquidprod client must be running for this functionality to work.");
+            } else {
+                dlgAlert("Failed to perform action!<div style='text-align:left'><br>Status code: " + status + "<br>Message: " + reply + "</div>");
+            }
+        }
+
+        function update_figure() {
+            // Update the figure
+
+            // get input parameters
+            let jargs = {'start': document.getElementById("tstart").value,
+                         'end': document.getElementById("tend").value,
+                         'width': document.getElementById("gaus_sigma").value,
+                        };
+
+            // check start and end times
+            if(new Date(jargs['end']).getTime() <= new Date(jargs['start']).getTime()){
+                alert("Start time must be less than the end time");
+                return;
+            }
+
+            // make an object to store the things to communicate to the python client
+            let params = Object();
+            params.client_name = "liquidprod";  // must match client name in python client
+            params.cmd = "draw_figure";         // command to run
+            params.args = JSON.stringify(jargs); // arguments, must be a string
+
+            // set loader
+            document.getElementById("figure_space").innerHTML = "<div class='loader'></div>";
+            document.getElementById("last_updated").innerHTML = '';
+
+            // make a call to the python client to generate the figure
+            mjsonrpc_call("jrpc", params).then(function(rpc) {
+                let [status, reply] = parse_rpc_response(rpc.result);
+                if (status == 1) {
+                    console.log('Generated figure successfully');
+                    let jreply = JSON.parse(reply);
+
+                    // insert figure into webpage
+                    let src = 'liquid_production/liquid_prod_rate_fig.html?random='+new Date().getTime()
+                    document.getElementById("figure_space").innerHTML = `<iframe id='rates_figure' src='${src}' height=550px width=950px border=0></iframe>`;
+
+                    // last updated string
+                    document.getElementById("last_updated").innerHTML = `Figure last updated on ${jreply["last"]}`;
+
+                } else {
+                    document.getElementById("figure_space").innerHTML = '';
+                    alert_rpc_error(status, reply);
+                }
+            }).catch(function(error) {
+                mjsonrpc_error_alert(error);
+            });
+        }
+
+        function update_times(){
+            // update string for times
+
+            // end time
+            if(document.getElementById('tend_now').checked){
+                let end_date = new Date();
+                let year = end_date.getFullYear();
+                let month = String(end_date.getMonth()+1).padStart(2, '0');
+                let day = String(end_date.getDate()).padStart(2, '0');
+                let hour = String(end_date.getHours()).padStart(2, '0');
+                let min = String(end_date.getMinutes()).padStart(2, '0');
+
+                let str_end = `${year}-${month}-${day}T${hour}:${min}`;
+                document.getElementById("tend").value = str_end;
+            }
+
+            // start time
+            let start_var = document.querySelector('input[name="start_radio"]:checked').value;
+
+            if(start_var !== "custom"){
+                start_var *= 1000*60*60;
+
+                let start_date = new Date();
+                start_date = new Date(start_date.getTime() - start_var);
+
+                year = start_date.getFullYear();
+                month = String(start_date.getMonth()+1).padStart(2, '0');
+                day = String(start_date.getDate()).padStart(2, '0');
+                hour = String(start_date.getHours()).padStart(2, '0');
+                min = String(start_date.getMinutes()).padStart(2, '0');
+
+                let str_start = `${year}-${month}-${day}T${hour}:${min}`;
+                document.getElementById("tstart").value = str_start;
+            }
+        }
+
+        function setup(){
+            // set default dates and times for input fields
+            // general setup
+
+            update_times();
+
+            // setup update callback when enter is pressed in input fields
+            let input_ids = ["tstart", "tend", "gaus_sigma"];
+
+            for(let i=0; i<input_ids.length; i++){
+                let inpt = document.getElementById(input_ids[i]);
+                inpt.addEventListener("keydown", function (e) {
+                        //checks whether the pressed key is "Enter"
+                        if (e.code === "Enter" || e.code === "NumpadEnter") {
+                            update_figure();
+                        }
+                    }
+                );
+            }
+        }
+
+        function set_custom_on_date_change(){
+            // click custom when the start date is changed
+            document.getElementById("start_radio_custom").checked = true;
+        }
+        function set_now_on_date_change(){
+            // unclick click Now checkbox when the end date is changed
+            document.getElementById("tend_now").checked = false;
         }
     </script>
 
 </head>
 
-<body class="mcss" onload="mhttpd_init('LiquidProdRate'); update()">
+<body class="mcss" onload="mhttpd_init('LiquidProdRate'); setup(); update_figure(); setInterval(update_times,5000)">
 
     <!-- header and side navigation will be filled in mhttpd_start -->
     <div id="mheader"></div>
     <div id="msidenav"></div>
     <div id="mmain">
-        <iframe id="rates_figure" src="" height=650px width=950px border=0></iframe>
+
         </br>
-        This figure updated every 5 mins
+        <h1>Liquifier Production Rate</h1>
+        This page shows the flow or change in the level from various sensors in the cryostat. The sum should be the change in the total amount of liquid He in the system.
+        </br></br>
+        <table>
+            <tr>
+                <td>Start date:</td>
+                <td><input type="datetime-local" id="tstart" onclick="set_custom_on_date_change();"></td>
+                <td><label><input type="radio" name="start_radio" id="start_radio_168" onclick="update_times();update_figure();" value=168> 7d</label>
+                    <label><input type="radio" name="start_radio" id="start_radio_72" onclick="update_times();update_figure();" value=72> 3d</label>
+                    <label><input type="radio" name="start_radio" id="start_radio_24" onclick="update_times();update_figure();" value=24> 24h</label>
+                    <label><input type="radio" name="start_radio" id="start_radio_12" onclick="update_times();update_figure();" value=12> 12h</label>
+                    <label><input type="radio" name="start_radio" id="start_radio_3" onclick="update_times();update_figure();" value=3> 3h</label>
+                    <label><input type="radio" name="start_radio" id="start_radio_1" onclick="update_times();update_figure();" value=1 checked> 1h</label>
+                    <label><input type="radio" name="start_radio" id="start_radio_custom" value="custom"> custom</label>
+                </td>
+            </tr>
+            <tr>
+                <td>End date:</td>
+                <td><input type="datetime-local" id="tend" onclick="set_now_on_date_change();"></td>
+                <td><label><input type="checkbox" id="tend_now" checked> Now</label></td>
+            </tr>
+            <tr>
+                <td colspan="3">Gaussian filter smoothing width: <input type="number" id="gaus_sigma" value="0.2" size="3" min="0" step="0.2"> minutes</td>
+            </tr>
+            <tr><td></td></tr>
+            <tr>
+                <td colspan="3" align="center"><input type="submit" value="Redraw" style="height:50px; width:200px" onclick="update_figure()"></td>
+            </tr>
+        </table>
+        </br>
+        <div id="figure_space"></div>
+        <div id="last_updated"></div>
     </div>
 </body>
 </html>
