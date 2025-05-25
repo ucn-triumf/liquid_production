@@ -192,7 +192,7 @@
 
 </head>
 
-<body class="mcss" onload="mhttpd_init('LiquidProdRate'); setup(); update_figure(); setInterval(update_times,5000)">
+<body class="mcss" onload="mhttpd_init('LiquidProdRate'); setup(); update_figure(); setInterval(update_times,1000)">
 
     <!-- header and side navigation will be filled in mhttpd_start -->
     <div id="mheader"></div>
@@ -222,27 +222,20 @@
                 <td><label><input type="checkbox" id="tend_now" checked> Now</label></td>
             </tr>
             <tr>
-                <td colspan="3">Rolling average window size: <input type="number" id="window" value="0.2" size="3" min="0" step="0.2"> minutes</td>
+                <td colspan="3">Rolling average window size: <input type="number" id="window" value="30" size="3" min="0" step="5"> minutes</td>
             </tr>
             <tr>
-                <td colspan="3"><a href="https://docs.scipy.org/doc/scipy/reference/signal.windows.html#module-scipy.signal.windows">Windowing function</a>:
-                    <select id="window_fn" value="None">
-                        <option value="None"> Uniform </option>
-                        <option value="barthann"> Barthann </option>
-                        <option value="barlett"> Bartlett </option>
-                        <option value="blackman"> Blackman </option>
-                        <option value="blackmanharris"> Blackmanharris </option>
-                        <option value="bohman"> Bohman </option>
-                        <option value="boxcar"> Boxcar </option>
-                        <option value="cosine"> Cosine </option>
-                        <option value="flattop"> Flattop </option>
-                        <option value="hamming"> Hamming </option>
-                        <option value="hann"> Hann </option>
-                        <option value="lanczos"> Lanczos </option>
-                        <option value="nuttall"> Nuttall </option>
-                        <option value="parzen"> Parzen </option>
-                        <option value="triang"> Triangular </option>
-                        <option value="tukey"> Tukey </option>
+                <td colspan="3"><a href="https://docs.scipy.org/doc/scipy/reference/signal.windows.html#module-scipy.signal.windows">Windowing (weighting) function</a>:
+                    <select onchange="update_figure()" id="window_fn" value="boxcar">
+                        <option value="boxcar"> Boxcar (uniform) </option>
+                        <!-- <option value="barthann"> Barthann (Bartlett-Hann: pointed Gaussian-like) </option> -->
+                        <!-- <option value="bartlett"> Bartlett (triangular that touches zero) </option> -->
+                        <option value="blackman"> Blackman ("Gaussian-like" with short tails) </option>
+                        <option value="blackmanharris"> Blackmanharris ("Gaussian-like" with long tails) </option>
+                        <option value="cosine"> Cosine (half-period) </option>
+                        <option value="hann"> Hann ("Gaussian-like" with very short tails) </option>
+                        <option value="parzen"> Parzen ("Gaussian-like") </option>
+                        <option value="triang"> Triangular (does not touch zero at the ends) </option>
                     </select>
                 </td>
             </tr>

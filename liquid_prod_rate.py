@@ -19,7 +19,7 @@ def calc_production_rate(t0, t1, window_size, window=None):
 
     # save original epoch times to later trim the dataframes
     t0_orig = int(t0.timestamp())
-    t1_orig = int(t1.timestamp())
+    t1_orig = int(min(t1.timestamp(), datetime.datetime.now().timestamp()-window_size))
 
     # expand the timestamps by the window size
     t0 -= datetime.timedelta(seconds=window_size)
@@ -41,17 +41,18 @@ def calc_production_rate(t0, t1, window_size, window=None):
     window_size = int(window_size/10)
 
     # data smoothing
-    df_flw = df_flw.rolling(window=window_size,
-                            min_periods=window_size,
-                            center=True,
-                            axis='index',
-                            win_type=window).mean()
+    if window_size > 0:
+        df_flw = df_flw.rolling(window=window_size,
+                                min_periods=window_size,
+                                center=True,
+                                axis='index',
+                                win_type=window).mean()
 
-    df_lvl = df_lvl.rolling(window=window_size,
-                            min_periods=window_size,
-                            center=True,
-                            axis='index',
-                            win_type=window).mean()
+        df_lvl = df_lvl.rolling(window=window_size,
+                                min_periods=window_size,
+                                center=True,
+                                axis='index',
+                                win_type=window).mean()
 
     # differentiate
     dt = df_lvl.index[1] - df_lvl.index[0]
