@@ -78,7 +78,8 @@
             // get input parameters
             let jargs = {'start': document.getElementById("tstart").value,
                          'end': document.getElementById("tend").value,
-                         'width': document.getElementById("gaus_sigma").value,
+                         'width': document.getElementById("window").value,
+                         'fn': document.getElementById("window_fn").value,
                         };
 
             // check start and end times
@@ -163,7 +164,7 @@
             update_times();
 
             // setup update callback when enter is pressed in input fields
-            let input_ids = ["tstart", "tend", "gaus_sigma"];
+            let input_ids = ["tstart", "tend", "window", "window_fn"];
 
             for(let i=0; i<input_ids.length; i++){
                 let inpt = document.getElementById(input_ids[i]);
@@ -221,12 +222,35 @@
                 <td><label><input type="checkbox" id="tend_now" checked> Now</label></td>
             </tr>
             <tr>
-                <td colspan="3">Gaussian filter smoothing width: <input type="number" id="gaus_sigma" value="0.2" size="3" min="0" step="0.2"> minutes</td>
+                <td colspan="3">Rolling average window size: <input type="number" id="window" value="0.2" size="3" min="0" step="0.2"> minutes</td>
+            </tr>
+            <tr>
+                <td colspan="3"><a href="https://docs.scipy.org/doc/scipy/reference/signal.windows.html#module-scipy.signal.windows">Windowing function</a>:
+                    <select id="window_fn" value="None">
+                        <option value="None"> Uniform </option>
+                        <option value="barthann"> Barthann </option>
+                        <option value="barlett"> Bartlett </option>
+                        <option value="blackman"> Blackman </option>
+                        <option value="blackmanharris"> Blackmanharris </option>
+                        <option value="bohman"> Bohman </option>
+                        <option value="boxcar"> Boxcar </option>
+                        <option value="cosine"> Cosine </option>
+                        <option value="flattop"> Flattop </option>
+                        <option value="hamming"> Hamming </option>
+                        <option value="hann"> Hann </option>
+                        <option value="lanczos"> Lanczos </option>
+                        <option value="nuttall"> Nuttall </option>
+                        <option value="parzen"> Parzen </option>
+                        <option value="triang"> Triangular </option>
+                        <option value="tukey"> Tukey </option>
+                    </select>
+                </td>
             </tr>
             <tr><td></td></tr>
             <tr>
                 <td colspan="3" align="center"><input type="submit" value="Redraw" style="height:50px; width:200px" onclick="update_figure()"></td>
             </tr>
+
         </table>
         </br>
         <div id="figure_space"></div>

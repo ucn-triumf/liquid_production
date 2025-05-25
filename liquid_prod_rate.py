@@ -15,7 +15,15 @@ import json
 import midas
 import midas.client
 
-def calc_production_rate(t0, t1, sigma):
+def calc_production_rate(t0, t1, window_size, window=None):
+
+    # save original epoch times to later trim the dataframes
+    t0_orig = int(t0.timestamp())
+    t1_orig = int(t1.timestamp())
+
+    # expand the timestamps by the window size
+    t0 -= datetime.timedelta(seconds=window_size)
+    t1 += datetime.timedelta(seconds=window_size)
 
     # read levels data
     df_lvl = get_data(settings.levels, t0, t1)
@@ -29,9 +37,21 @@ def calc_production_rate(t0, t1, sigma):
     df_lvl.dropna(axis='columns', how='all', inplace=True)
     df_flw.dropna(axis='columns', how='all', inplace=True)
 
+    # window to seconds
+    window_size = int(window_size/10)
+
     # data smoothing
-    df_flw = df_flw.apply(gaussian_filter, sigma=sigma, axis='index')
-    df_lvl = df_lvl.apply(gaussian_filter, sigma=sigma, axis='index')
+    df_flw = df_flw.rolling(window=window_size,
+                            min_periods=window_size,
+                            center=True,
+                            axis='index',
+                            win_type=window).mean()
+
+    df_lvl = df_lvl.rolling(window=window_size,
+                            min_periods=window_size,
+                            center=True,
+                            axis='index',
+                            win_type=window).mean()
 
     # differentiate
     dt = df_lvl.index[1] - df_lvl.index[0]
@@ -64,6 +84,10 @@ def calc_production_rate(t0, t1, sigma):
         factor = int(len(rates)/1000)
         rates = rates.loc[::factor]
         prod_rate = prod_rate.loc[::factor]
+
+    # trim
+    rates = rates.loc[t0_orig:t1_orig]
+    prod_rate = prod_rate.loc[t0_orig:t1_orig]
 
     # get time in current timezone
     x = pd.to_datetime(rates.index.values, unit='s', utc=True).tz_convert('America/Vancouver')
@@ -133,15 +157,19 @@ def rpc_handler(client, cmd, args, max_len):
         jargs = json.loads(args)
         t0 = jargs.get("start")
         t1 = jargs.get("end")
-        sigma = jargs.get("width")
+        window_size = jargs.get("width")
+        window_fn = jargs.get("fn")
+
+        if window_fn == "None":
+            window_fn = None
 
         # convert times to datetime objects
         t0 = datetime.datetime.strptime(t0, '%Y-%m-%dT%H:%M')
         t1 = datetime.datetime.strptime(t1, '%Y-%m-%dT%H:%M')
-        sigma = float(sigma)*60
+        window_size = float(window_size)*60
 
         # make new figure
-        calc_production_rate(t0, t1, sigma)
+        calc_production_rate(t0, t1, window_size, window_fn)
 
         # output
         ret_int = midas.status_codes["SUCCESS"]
