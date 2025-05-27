@@ -11,11 +11,11 @@ import numpy as np
 from toolkit import get_data
 import settings
 from scipy.ndimage import gaussian_filter
-import json
+import json, demjson
 import midas
 import midas.client
 
-def calc_production_rate(t0, t1, window_size, window=None):
+def calc_production_rate(t0, t1, window_size, window=None, **window_kwargs):
 
     # save original epoch times to later trim the dataframes
     t0_orig = int(t0.timestamp())
@@ -46,13 +46,15 @@ def calc_production_rate(t0, t1, window_size, window=None):
                                 min_periods=window_size,
                                 center=True,
                                 axis='index',
-                                win_type=window).mean()
+                                win_type=window,
+                                ).mean(**window_kwargs)
 
         df_lvl = df_lvl.rolling(window=window_size,
                                 min_periods=window_size,
                                 center=True,
                                 axis='index',
-                                win_type=window).mean()
+                                win_type=window,
+                                ).mean(**window_kwargs)
 
     # differentiate
     dt = df_lvl.index[1] - df_lvl.index[0]
@@ -161,8 +163,18 @@ def rpc_handler(client, cmd, args, max_len):
         window_size = jargs.get("width")
         window_fn = jargs.get("fn")
 
-        if window_fn == "None":
-            window_fn = None
+        # split out passed parameters to functions
+        winlist = window_fn.split(';')
+        window_fn = winlist[0]
+
+        if len(winlist) < 2:
+            window_kwargs = {}
+        else:
+            window_kwargs = demjson.decode(winlist[1])
+
+        # convert gaussian widths into units of samples
+        if window_fn == 'gaussian':
+            window_kwargs['std'] = window_kwargs['std']*window_size*6
 
         # convert times to datetime objects
         t0 = datetime.datetime.strptime(t0, '%Y-%m-%dT%H:%M')
@@ -170,7 +182,7 @@ def rpc_handler(client, cmd, args, max_len):
         window_size = float(window_size)*60
 
         # make new figure
-        calc_production_rate(t0, t1, window_size, window_fn)
+        calc_production_rate(t0, t1, window_size, window_fn, **window_kwargs)
 
         # output
         ret_int = midas.status_codes["SUCCESS"]

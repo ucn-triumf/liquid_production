@@ -80,7 +80,13 @@
                          'end': document.getElementById("tend").value,
                          'width': document.getElementById("window").value,
                          'fn': document.getElementById("window_fn").value,
+                         'window_kwargs': "{}",
                         };
+
+            // add some other parameters
+            if(jargs['fn'] == 'exponential'){
+                jargs['window_kwargs'] = '{tau: 1.0}';
+            }
 
             // check start and end times
             if(new Date(jargs['end']).getTime() <= new Date(jargs['start']).getTime()){
@@ -222,20 +228,16 @@
                 <td><label><input type="checkbox" id="tend_now" checked> Now</label></td>
             </tr>
             <tr>
-                <td colspan="3">Rolling average window size: <input type="number" id="window" value="30" size="3" min="0" step="5"> minutes</td>
+                <td colspan="3">Rolling average window size: <input type="number" id="window" value="10" size="3" min="0" step="5"> minutes</td>
             </tr>
             <tr>
-                <td colspan="3"><a href="https://docs.scipy.org/doc/scipy/reference/signal.windows.html#module-scipy.signal.windows">Windowing (weighting) function</a>:
+                <td colspan="3"><a href="https://docs.scipy.org/doc/scipy/reference/signal.windows.html#module-scipy.signal.windows" target="_blank">Windowing (weighting) function</a>:
                     <select onchange="update_figure()" id="window_fn" value="boxcar">
                         <option value="boxcar"> Boxcar (uniform) </option>
-                        <!-- <option value="barthann"> Barthann (Bartlett-Hann: pointed Gaussian-like) </option> -->
-                        <!-- <option value="bartlett"> Bartlett (triangular that touches zero) </option> -->
-                        <option value="blackman"> Blackman ("Gaussian-like" with short tails) </option>
-                        <option value="blackmanharris"> Blackmanharris ("Gaussian-like" with long tails) </option>
-                        <option value="cosine"> Cosine (half-period) </option>
-                        <option value="hann"> Hann ("Gaussian-like" with very short tails) </option>
-                        <option value="parzen"> Parzen ("Gaussian-like") </option>
-                        <option value="triang"> Triangular (does not touch zero at the ends) </option>
+                        <option value="blackman"> Blackman (Cosine sum: smooth peak with short tails) </option>
+                        <option value="blackmanharris"> Blackman-Harris (Similar to Blackman but narrower) </option>
+                        <option value="cosine"> Cosine (half-period, very wide) </option>
+                        <option value="triang"> Triangular</option>
                     </select>
                 </td>
             </tr>
