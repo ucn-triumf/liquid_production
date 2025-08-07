@@ -97,19 +97,37 @@ def calc_production_rate(t0, t1, window_size, window=None, **window_kwargs):
 
     # draw
     data = []
+    return_flow = 0 # save sum of average return flows
+
     for col in rates:
         if 'd' == col[0]: continue
 
         data.append(go.Line(x=x,
                             y=rates[col].values,
                             name=col))
-
+                            
+        # save mean return flow
+        if 'Return Flow' in col:
+            return_flow += rates[col].mean()
+                            
     data.append(go.Line(x=x,
                         y=prod_rate.values,
                         name='Amount of liquified He (sum)',
                         line=dict(width=5, color='black'))
                     )
     fig = go.Figure(data)
+    fig.add_hline(y=prod_rate.mean(), line_color='lightgrey', line_dash="dot", 
+                    annotation_text=f"Full range liquid average ({prod_rate.mean():.1f})", 
+                    annotation_position="bottom right",
+                    annotation_font=dict(color="darkgrey"),
+                 )
+
+    fig.add_hline(y=return_flow, line_color='mediumpurple', line_dash="dot", 
+                    annotation_text=f"Return flow average sum ({return_flow:.1f})", 
+                    annotation_position="bottom left",
+                    annotation_font=dict(color="purple"),
+                 )
+
 
     fig.update_layout(
         title='',
