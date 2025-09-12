@@ -87,7 +87,8 @@ def md_fill_rate(t0, t1):
     # plot elements
     ax1.set_ylabel('MD Level (%)')
     ax2.set_ylabel('MD Fill Rate (L/hr)')
-    ax = plt.gca()
+    ax2.tick_params(axis='x', which='major', labelsize='x-small')
+
 
     # setup figure with plugins
     plugins.clear(fig)  # clear all plugins from the figure
