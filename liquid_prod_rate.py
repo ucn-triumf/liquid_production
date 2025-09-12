@@ -6,151 +6,101 @@
 
 import pandas as pd
 import datetime
-import plotly.graph_objs as go
 import numpy as np
-from toolkit import get_data
-import settings
-from scipy.ndimage import gaussian_filter
 import json, demjson
 import midas
 import midas.client
+import matplotlib.pyplot as plt, mpld3
+from scipy.optimize import curve_fit
+from ucnhistory import ucnhistory
 
-def calc_production_rate(t0, t1, window_size, window=None, **window_kwargs):
+from mpld3 import plugins
 
-    # save original epoch times to later trim the dataframes
-    t0_orig = int(t0.timestamp())
-    t1_orig = int(min(t1.timestamp(), datetime.datetime.now().timestamp()-window_size))
+def md_fill_rate(t0, t1):
 
-    # expand the timestamps by the window size
-    t0 -= datetime.timedelta(seconds=window_size)
-    t1 += datetime.timedelta(seconds=window_size)
+    # get data
+    hist = ucnhistory()
 
-    # read levels data
-    df_lvl = get_data(settings.levels, t0, t1)
-    df_lvl *= settings.conv
+    df = hist.get_data(table='ucn2epicsothers_measured',
+                    columns=['ucn2_he4_fpv211_rddacp_measured',
+                                'ucn2_he4_lvl204_rdlvl_measured'],
+                    start = t0,
+                    stop = t1)
 
-    # read the flows in liquid L/min
-    df_flw = get_data(settings.flows, t0, t1)
-    df_flw /= 745
+    df.rename(columns={'ucn2_he4_fpv211_rddacp_measured':'fpv211',
+                    'ucn2_he4_lvl204_rdlvl_measured':'lvl204'},
+            inplace=True)
 
-    # drop all nan columns
-    df_lvl.dropna(axis='columns', how='all', inplace=True)
-    df_flw.dropna(axis='columns', how='all', inplace=True)
+    # some data cleaning
+    df = df.loc[df.lvl204 > 0]
 
-    # window to seconds
-    window_size = int(window_size/10)
+    df.epoch_time -= 3600*8
 
-    # data smoothing
-    if window_size > 0:
-        df_flw = df_flw.rolling(window=window_size,
-                                min_periods=window_size,
-                                center=True,
-                                axis='index',
-                                win_type=window,
-                                ).mean(**window_kwargs)
+    # get only when FPV211 is off
+    df = df.loc[df.fpv211 == 0]
+    dt_sep = df.epoch_time[df.epoch_time.diff() > 1000].values
+    dt_sep = np.concatenate(([0], dt_sep, [int(2e9)]))
 
-        df_lvl = df_lvl.rolling(window=window_size,
-                                min_periods=window_size,
-                                center=True,
-                                axis='index',
-                                win_type=window,
-                                ).mean(**window_kwargs)
+    # reset index
+    df.set_index('epoch_time', inplace=True)
 
-    # differentiate
-    dt = df_lvl.index[1] - df_lvl.index[0]
-    df_lvl = df_lvl.diff()/dt
+    # fit function
+    fn = lambda x, a, b: a*x+b
 
-    # per hour
-    df_lvl *= 3600
-    df_flw *= 60
+    # save results
+    rates = []
+    drates = []
+    times_start = []
+    times_stop = []
 
-    # ensure timestamps at least have a chance of matching
-    df_lvl.index = df_lvl.index.astype(int)
-    df_flw.index = df_flw.index.astype(int)
+    fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, sharey=False, sharex=True,
+                                figsize=(8,7),
+                                gridspec_kw={'hspace':0.05,
+                                             'height_ratios':(1,3)})
 
-    # concatenate
-    rates = pd.concat((df_lvl, df_flw), axis='columns')
+    # iterate times
+    for begin, end in zip(dt_sep[:-1], dt_sep[1:]):
+        df1 = df.loc[begin+300:end-300]
+        t0 = min(df1.index)
+        x = df1.index.values - t0
 
-    # fill mismatched indices
-    rates.interpolate(inplace=True)
+        # fit with linear line
+        par, cov = curve_fit(fn, x, df1.lvl204, p0=(1e4, 20))
+        std = np.diag(cov)**0.5
 
-    # corrections
-    for col in settings.corr:
-        rates[col] = settings.corr[col](rates[col])
+        date = pd.to_datetime(df1.index, unit='s')
+        ax1.plot(date, df1.lvl204)
+        ax1.plot(date, fn(x, *par), color='k')
 
-    # get production rate
-    rates.rename(columns=settings.labels, inplace=True)
-    prod_rate = rates.sum(axis='columns')
+        # convert rates to L/h
+        par[0] *= 3600*12.6
+        std[0] *= 3600*12.6
 
-    # downsample
-    if len(rates) > 1000:
-        factor = int(len(rates)/1000)
-        rates = rates.loc[::factor]
-        prod_rate = prod_rate.loc[::factor]
+        rates.append(par[0])
+        drates.append(std[0])
+        times_start.append(pd.to_datetime(min(df1.index), unit='s'))
+        times_stop.append(pd.to_datetime(max(df1.index), unit='s'))
 
-    # trim
-    rates = rates.loc[t0_orig:t1_orig]
-    prod_rate = prod_rate.loc[t0_orig:t1_orig]
+    for starti, stopi, rate, drate in zip(times_start, times_stop, rates, drates):
+        ax2.fill_between((starti, stopi), rate+drate, rate-drate, color='C0')
 
-    # get time in current timezone
-    x = pd.to_datetime(rates.index.values, unit='s', utc=True).tz_convert('America/Vancouver')
+    # plot elements
+    ax1.set_ylabel('MD Level (%)')
+    ax2.set_ylabel('MD Fill Rate (L/hr)')
+    ax = plt.gca()
 
-    # draw
-    data = []
-    return_flow = 0 # save sum of average return flows
+    # setup figure with plugins
+    plugins.clear(fig)  # clear all plugins from the figure
+    plugins.connect(fig, plugins.Reset(), plugins.BoxZoom(), plugins.Zoom(),
+                    plugins.MousePosition(fontsize=12, fmt='.1g'))
 
-    for col in rates:
-        if 'd' == col[0]: continue
+    # tooltips
+    # labels = [f"{r:.1f} L/hr" for r in rates]
+    # tooltip = plugins.PointLabelTooltip(points, labels)
+    # plugins.connect(fig, tooltip)
 
-        data.append(go.Line(x=x,
-                            y=rates[col].values,
-                            name=col))
-                            
-        # save mean return flow
-        if 'Return Flow' in col:
-            return_flow += rates[col].mean()
-                            
-    data.append(go.Line(x=x,
-                        y=prod_rate.values,
-                        name='Amount of liquified He (sum)',
-                        line=dict(width=5, color='black'))
-                    )
-    fig = go.Figure(data)
-    fig.add_hline(y=prod_rate.mean(), line_color='lightgrey', line_dash="dot", 
-                    annotation_text=f"Full range liquid average ({prod_rate.mean():.1f})", 
-                    annotation_position="bottom right",
-                    annotation_font=dict(color="darkgrey"),
-                 )
-
-    fig.add_hline(y=return_flow, line_color='mediumpurple', line_dash="dot", 
-                    annotation_text=f"Return flow average sum ({return_flow:.1f})", 
-                    annotation_position="bottom left",
-                    annotation_font=dict(color="purple"),
-                 )
-
-
-    fig.update_layout(
-        title='',
-        yaxis_title='Change in Level or Flow (Liquid L/h)',
-        font=dict(
-            family="Arial",
-            size=16,
-            color="Black"
-        ),
-        plot_bgcolor='rgba(0,0,0,0)',
-        width=900,
-        height=525,
-        margin=dict(autoexpand=True,
-                b=0,
-                t=20,
-                ),
-    )
-
-    fig.update_xaxes(showline=True, linewidth=2, linecolor='black', gridcolor='Gray', zerolinecolor='Gray')
-    fig.update_yaxes(showline=True, linewidth=2, linecolor='black', gridcolor='Gray', zerolinecolor='Gray')
-
-    # write figure for later insertion into web page
-    fig.write_html('/home/ucn/online/ucn-web-control/liquid_production/liquid_prod_rate_fig.html')
+    # save to html
+    mpld3.save_html(fig, 'liquid_prod_rate_fig.html', template_type='simple')
 
 def rpc_handler(client, cmd, args, max_len):
     """
@@ -178,29 +128,12 @@ def rpc_handler(client, cmd, args, max_len):
         jargs = json.loads(args)
         t0 = jargs.get("start")
         t1 = jargs.get("end")
-        window_size = jargs.get("width")
-        window_fn = jargs.get("fn")
-
-        # split out passed parameters to functions
-        winlist = window_fn.split(';')
-        window_fn = winlist[0]
-
-        if len(winlist) < 2:
-            window_kwargs = {}
-        else:
-            window_kwargs = demjson.decode(winlist[1])
-
-        # convert gaussian widths into units of samples
-        if window_fn == 'gaussian':
-            window_kwargs['std'] = window_kwargs['std']*window_size*6
 
         # convert times to datetime objects
         t0 = datetime.datetime.strptime(t0, '%Y-%m-%dT%H:%M')
         t1 = datetime.datetime.strptime(t1, '%Y-%m-%dT%H:%M')
-        window_size = float(window_size)*60
 
-        # make new figure
-        calc_production_rate(t0, t1, window_size, window_fn, **window_kwargs)
+        md_fill_rate(t0, t1)
 
         # output
         ret_int = midas.status_codes["SUCCESS"]

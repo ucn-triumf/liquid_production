@@ -78,15 +78,7 @@
             // get input parameters
             let jargs = {'start': document.getElementById("tstart").value,
                          'end': document.getElementById("tend").value,
-                         'width': document.getElementById("window").value,
-                         'fn': document.getElementById("window_fn").value,
-                         'window_kwargs': "{}",
                         };
-
-            // add some other parameters
-            if(jargs['fn'] == 'exponential'){
-                jargs['window_kwargs'] = '{tau: 1.0}';
-            }
 
             // check start and end times
             if(new Date(jargs['end']).getTime() <= new Date(jargs['start']).getTime()){
@@ -113,7 +105,7 @@
 
                     // insert figure into webpage
                     let src = 'liquid_production/liquid_prod_rate_fig.html?random='+new Date().getTime()
-                    document.getElementById("figure_space").innerHTML = `<iframe id='rates_figure' src='${src}' height=550px width=950px border=0></iframe>`;
+                    document.getElementById("figure_space").innerHTML = `<iframe id='rates_figure' src='${src}' height=750px width=950px border=0></iframe>`;
 
                     // last updated string
                     document.getElementById("last_updated").innerHTML = `Figure last updated on ${jreply["last"]}`;
@@ -170,7 +162,7 @@
             update_times();
 
             // setup update callback when enter is pressed in input fields
-            let input_ids = ["tstart", "tend", "window", "window_fn"];
+            let input_ids = ["tstart", "tend"];
 
             for(let i=0; i<input_ids.length; i++){
                 let inpt = document.getElementById(input_ids[i]);
@@ -226,20 +218,6 @@
                 <td>End date:</td>
                 <td><input type="datetime-local" id="tend" onclick="callback_tend();update_times();"></td>
                 <td><label><input type="checkbox" id="tend_now" checked> Now</label></td>
-            </tr>
-            <tr>
-                <td colspan="3">Rolling average window size: <input type="number" id="window" value="10" size="3" min="0" step="5"> minutes</td>
-            </tr>
-            <tr>
-                <td colspan="3"><a href="https://docs.scipy.org/doc/scipy/reference/signal.windows.html#module-scipy.signal.windows" target="_blank">Windowing (weighting) function</a>:
-                    <select onchange="update_figure()" id="window_fn" value="boxcar">
-                        <option value="boxcar"> Boxcar (uniform) </option>
-                        <option value="blackman"> Blackman (Cosine sum: smooth peak with short tails) </option>
-                        <option value="blackmanharris"> Blackman-Harris (Similar to Blackman but narrower) </option>
-                        <option value="cosine"> Cosine (half-period, very wide) </option>
-                        <option value="triang"> Triangular</option>
-                    </select>
-                </td>
             </tr>
             <tr><td></td></tr>
             <tr>
