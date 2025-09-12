@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+        <!DOCTYPE html>
 <html class="mcss" lang="en">
 <head>
    <meta charset="UTF-8">
@@ -11,9 +11,18 @@
    <script src="mhttpd.js"></script>
    <title>Liquifier Production Rate</title>
    <style>
-        column1 {
+        .column {
             float: left;
-            padding: 5px;
+            width: 50%;
+        }
+
+        .inputcol {
+            padding: 30px;
+            padding-right: 50px;
+        }
+
+        body {
+            padding-left: 50px;
         }
 
         .loader {
@@ -25,6 +34,31 @@
             -webkit-animation: spin 2s linear infinite; /* Safari */
             animation: spin 2s linear infinite;
             padding: 10px;
+        }
+
+        .button {
+            border: 2px solid #FF8C00;
+            color: black;
+            background-color: white;
+            padding: 16px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            transition-duration: 0.4s;
+            cursor: pointer;
+            }
+
+        .button:hover {
+            background-color: #FF8C00;
+            color: white;
+        }
+
+        @media screen and (max-width: 200px) {
+           .column {
+                width: 100%;
+            }
         }
 
         /* Safari */
@@ -105,7 +139,7 @@
 
                     // insert figure into webpage
                     let src = 'liquid_production/liquid_prod_rate_fig.html?random='+new Date().getTime()
-                    document.getElementById("figure_space").innerHTML = `<iframe id='rates_figure' src='${src}' height=750px width=950px border=0></iframe>`;
+                    document.getElementById("figure_space").innerHTML = `<iframe id='rates_figure' src='${src}' height=725px width=825px border=0></iframe>`;
 
                     // last updated string
                     document.getElementById("last_updated").innerHTML = `Figure last updated on ${jreply["last"]}`;
@@ -199,34 +233,40 @@
 
         </br>
         <h1>Liquifier Production Rate</h1>
-        This page shows the flow or change in the level from various sensors in the cryostat. The sum should be the change in the total amount of liquid He in the system.
-        </br></br>
-        <table>
-            <tr>
-                <td>Start date:</td>
-                <td><input type="datetime-local" id="tstart" onclick="callback_tstart();"></td>
-                <td><label><input type="radio" name="start_radio" id="start_radio_168" onclick="update_times();update_figure();" value=672> 4w</label>
-                    <label><input type="radio" name="start_radio" id="start_radio_168" onclick="update_times();update_figure();" value=336> 2w</label>
-                    <label><input type="radio" name="start_radio" id="start_radio_168" onclick="update_times();update_figure();" value=168> 7d</label>
-                    <label><input type="radio" name="start_radio" id="start_radio_72" onclick="update_times();update_figure();" value=72> 3d</label>
-                    <label><input type="radio" name="start_radio" id="start_radio_24" onclick="update_times();update_figure();" value=24 checked> 24h</label>
-                    <label><input type="radio" name="start_radio" id="start_radio_custom" value="custom"> custom</label>
-                </td>
-            </tr>
-            <tr>
-                <td>End date:</td>
-                <td><input type="datetime-local" id="tend" onclick="callback_tend();update_times();"></td>
-                <td><label><input type="checkbox" id="tend_now" checked> Now</label></td>
-            </tr>
-            <tr><td></td></tr>
-            <tr>
-                <td colspan="3" align="center"><input type="submit" value="Redraw" style="height:50px; width:200px" onclick="update_figure()"></td>
-            </tr>
-
-        </table>
-        </br>
-        <div id="figure_space"></div>
-        <div id="last_updated"></div>
+        <div class="row">
+            <div class="column">
+                <div class="inputcol">
+                    This page shows fill rate of the mother dewar (MD) in the periods where FPV211 is closed: we are not drawing liquid from the MD. In this case, the MD is likely to be a closed system, with only the liquifier adding to the level. In this case the fill rate of the MD will be the liquifier production rate.
+                    </br></br></br>
+                    <table>
+                        <tr>
+                            <td>Start date:</td>
+                            <td><input type="datetime-local" id="tstart" onclick="callback_tstart();"></td>
+                            <td><label><input type="radio" name="start_radio" id="start_radio_168" onclick="update_times();update_figure();" value=672> 4w</label>
+                                <label><input type="radio" name="start_radio" id="start_radio_168" onclick="update_times();update_figure();" value=336> 2w</label>
+                                <label><input type="radio" name="start_radio" id="start_radio_168" onclick="update_times();update_figure();" value=168> 7d</label>
+                                <label><input type="radio" name="start_radio" id="start_radio_72" onclick="update_times();update_figure();" value=72> 3d</label>
+                                <label><input type="radio" name="start_radio" id="start_radio_24" onclick="update_times();update_figure();" value=24 checked> 24h</label>
+                                <label><input type="radio" name="start_radio" id="start_radio_custom" value="custom"> custom</label>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>End date:</td>
+                            <td><input type="datetime-local" id="tend" onclick="callback_tend();update_times();"></td>
+                            <td><label><input type="checkbox" id="tend_now" checked> Now</label></td>
+                        </tr>
+                        <tr><td><br><br><br></td></tr>
+                        <tr>
+                            <td colspan="3" align="center"><input type="submit" class="button" value="Redraw" style="height:50px; width:200px" onclick="update_figure()"></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <div class="column">
+                <div id="figure_space"></div>
+                <div id="last_updated"></div>
+            </div>
+        </div>
     </div>
 </body>
 </html>
