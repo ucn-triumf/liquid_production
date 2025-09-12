@@ -61,11 +61,18 @@ def md_fill_rate(t0, t1):
     # iterate times
     for begin, end in zip(dt_sep[:-1], dt_sep[1:]):
         df1 = df.loc[begin+300:end-300]
+
+        if len(df1) == 0:
+            continue
+
         t0 = min(df1.index)
         x = df1.index.values - t0
 
         # fit with linear line
-        par, cov = curve_fit(fn, x, df1.lvl204, p0=(1e4, 20))
+        try:
+            par, cov = curve_fit(fn, x, df1.lvl204, p0=(1e4, 20))
+        except TypeError:
+            continue
         std = np.diag(cov)**0.5
 
         date = pd.to_datetime(df1.index, unit='s')
