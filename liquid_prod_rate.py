@@ -91,13 +91,7 @@ def md_fill_rate(t0, t1):
 
     # setup figure with plugins
     plugins.clear(fig)  # clear all plugins from the figure
-    plugins.connect(fig, plugins.Reset(), plugins.BoxZoom(), plugins.Zoom(),
-                    plugins.MousePosition(fontsize=12, fmt='.1g'))
-
-    # tooltips
-    # labels = [f"{r:.1f} L/hr" for r in rates]
-    # tooltip = plugins.PointLabelTooltip(points, labels)
-    # plugins.connect(fig, tooltip)
+    plugins.connect(fig, plugins.Reset(), plugins.BoxZoom(), plugins.Zoom())
 
     # save to html
     mpld3.save_html(fig, 'liquid_prod_rate_fig.html', template_type='simple')
