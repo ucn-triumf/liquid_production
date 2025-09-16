@@ -31,18 +31,28 @@ def md_fill_rate(t0, t1):
                     'ucn2_he4_lvl204_rdlvl_measured':'lvl204'},
             inplace=True)
 
-    # some data cleaning
-    df = df.loc[df.lvl204 > 0]
+    df_orig = df.copy()
 
+    # some data cleaning
+    df = df.loc[df.lvl204 > 10]
+
+    # fix timestamps
     df.epoch_time -= 3600*8
+    df_orig.epoch_time -= 3600*8
+
+    # get only when slope is increasing
+    df = df.loc[df.lvl204.diff(periods=100) > 0]
 
     # get only when FPV211 is off
-    df = df.loc[df.fpv211 == 0]
+    # df = df.loc[df.fpv211 == 0]
+
+    # get times of transition
     dt_sep = df.epoch_time[df.epoch_time.diff() > 1000].values
     dt_sep = np.concatenate(([0], dt_sep, [int(2e9)]))
 
     # reset index
     df.set_index('epoch_time', inplace=True)
+    df_orig.set_index('epoch_time', inplace=True)
 
     # fit function
     fn = lambda x, a, b: a*x+b
@@ -52,17 +62,33 @@ def md_fill_rate(t0, t1):
     drates = []
     times_start = []
     times_stop = []
+    t = []
+    colors = []
 
     fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, sharey=False, sharex=True,
-                                figsize=(8,7),
+                                figsize=(8,8),
                                 gridspec_kw={'hspace':0.05,
-                                             'height_ratios':(1,3)})
+                                             'height_ratios':(1,2)})
+
+    # draw background data
+    date = pd.to_datetime(df_orig.index, unit='s')
+    ax1.plot(date, df_orig.lvl204, color='gray')
 
     # iterate times
     for begin, end in zip(dt_sep[:-1], dt_sep[1:]):
-        df1 = df.loc[begin+300:end-300]
 
-        if len(df1) == 0:
+        # get data segment
+        df1 = df.loc[begin:end]
+
+        # trim first and last point to avoid off by one errors
+        df1 = df1.iloc[1:-1]
+
+        # trim start and end times
+        idx = (df1.index > df1.index.min()+100) & (df1.index < df1.index.max()-300)
+        df1 = df1.loc[idx]
+
+        # needs a decently long set of data to fit
+        if len(df1) < 20:
             continue
 
         t0 = min(df1.index)
@@ -75,27 +101,35 @@ def md_fill_rate(t0, t1):
             continue
         std = np.diag(cov)**0.5
 
+        # throw out slopes that are near zero
+        if par[0]*3600*12.6 < 3:
+            continue
+
+        # draw
         date = pd.to_datetime(df1.index, unit='s')
-        ax1.plot(date, df1.lvl204)
+        line = ax1.plot(date, df1.lvl204, lw=2)
         ax1.plot(date, fn(x, *par), color='k')
 
         # convert rates to L/h
         par[0] *= 3600*12.6
         std[0] *= 3600*12.6
 
+        # save fit results
         rates.append(par[0])
         drates.append(std[0])
         times_start.append(pd.to_datetime(min(df1.index), unit='s'))
         times_stop.append(pd.to_datetime(max(df1.index), unit='s'))
+        t.append(np.mean(df1.index))
+        colors.append(line[0].get_color())
 
-    for starti, stopi, rate, drate in zip(times_start, times_stop, rates, drates):
-        ax2.fill_between((starti, stopi), rate+drate, rate-drate, color='C0')
+    # ax2.errorbar(pd.to_datetime(t, unit='s'), rates, drates, fmt='o', ls='none', color='k', fillstyle='full')
+    for starti, stopi, rate, drate, clr in zip(times_start, times_stop, rates, drates, colors):
+        ax2.fill_between((starti, stopi), rate+drate, rate-drate, color=clr)
 
     # plot elements
     ax1.set_ylabel('MD Level (%)')
     ax2.set_ylabel('MD Fill Rate (L/hr)')
     ax2.tick_params(axis='x', which='major', labelsize='x-small')
-
 
     # setup figure with plugins
     plugins.clear(fig)  # clear all plugins from the figure
