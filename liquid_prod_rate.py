@@ -10,9 +10,11 @@ import numpy as np
 import json, demjson
 import midas
 import midas.client
-import matplotlib.pyplot as plt, mpld3
 from scipy.optimize import curve_fit
 from ucnhistory import ucnhistory
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+# from plotly.io import write_html
 
 from mpld3 import plugins
 
@@ -43,9 +45,6 @@ def md_fill_rate(t0, t1):
     # get only when slope is increasing
     df = df.loc[df.lvl204.diff(periods=100) > 0]
 
-    # get only when FPV211 is off
-    # df = df.loc[df.fpv211 == 0]
-
     # get times of transition
     dt_sep = df.epoch_time[df.epoch_time.diff() > 1000].values
     dt_sep = np.concatenate(([0], dt_sep, [int(2e9)]))
@@ -58,21 +57,22 @@ def md_fill_rate(t0, t1):
     fn = lambda x, a, b: a*x+b
 
     # save results
-    rates = []
-    drates = []
-    times_start = []
-    times_stop = []
-    t = []
-    colors = []
+    rates = []          # fill rate
+    drates = []         # error in fill rate
+    times_center = []   # center time in datetime
+    mins = []           # minimum values for each period
+    epoch_min_times = []   # center time in epoch time
 
-    fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, sharey=False, sharex=True,
-                                figsize=(8,8),
-                                gridspec_kw={'hspace':0.05,
-                                             'height_ratios':(1,2)})
+    fig = make_subplots(rows=3, cols=1,
+                    shared_xaxes=True,
+                    vertical_spacing=0.02)
 
     # draw background data
-    date = pd.to_datetime(df_orig.index, unit='s')
-    ax1.plot(date, df_orig.lvl204, color='gray')
+    fig.add_trace(go.Scatter(x=pd.to_datetime(df.index, unit='s'),
+                         y=df.lvl204,
+                         name='',
+                         marker = {'color' : 'grey'},),
+              row=1, col=1)
 
     # iterate times
     for begin, end in zip(dt_sep[:-1], dt_sep[1:]):
@@ -88,7 +88,7 @@ def md_fill_rate(t0, t1):
         df1 = df1.loc[idx]
 
         # needs a decently long set of data to fit
-        if len(df1) < 20:
+        if len(df1) < 100:
             continue
 
         t0 = min(df1.index)
@@ -107,8 +107,16 @@ def md_fill_rate(t0, t1):
 
         # draw
         date = pd.to_datetime(df1.index, unit='s')
-        line = ax1.plot(date, df1.lvl204, lw=2)
-        ax1.plot(date, fn(x, *par), color='k')
+        fig.add_trace(go.Scatter(x=date, y=df1.lvl204,
+                                name='',
+                                line = {'width' : 2},),
+                    row=1, col=1, )
+        fig.add_trace(go.Scatter(x=date, y=fn(x, *par),
+                        marker = {'color' : 'black'},
+                        name='',
+                        hovertemplate=f"LVL204 [%] = {par[0]*3600:.1f} [%/h] t + {par[1]:.1f} [%]<br>LVL204 [L] = {par[0]*3600*12.6:.1f} [L/h] t + {par[1]*12.6:.1f} [L]"
+                        ),
+                    row=1, col=1)
 
         # convert rates to L/h
         par[0] *= 3600*12.6
@@ -117,26 +125,44 @@ def md_fill_rate(t0, t1):
         # save fit results
         rates.append(par[0])
         drates.append(std[0])
-        times_start.append(pd.to_datetime(min(df1.index), unit='s'))
-        times_stop.append(pd.to_datetime(max(df1.index), unit='s'))
-        t.append(np.mean(df1.index))
-        colors.append(line[0].get_color())
+        times_center.append(pd.to_datetime(np.mean(df1.index), unit='s'))
+        epoch_min_times.append(min(df1.index))
+        mins.append(fn(min(x), *par))
 
-    # ax2.errorbar(pd.to_datetime(t, unit='s'), rates, drates, fmt='o', ls='none', color='k', fillstyle='full')
-    for starti, stopi, rate, drate, clr in zip(times_start, times_stop, rates, drates, colors):
-        ax2.fill_between((starti, stopi), rate+drate, rate-drate, color=clr)
+    # plotly drawing
+    fig.add_trace(go.Scatter(x=times_center,
+                         y=rates,
+                         error_y = {'type':'data', 'array':drates, 'visible':True, 'width':0},
+                         name = '',
+                         marker = {'color':'black',
+                                   'size':10},
+                         mode='markers',),
+                row=2, col=1,)
 
-    # plot elements
-    ax1.set_ylabel('MD Level (%)')
-    ax2.set_ylabel('MD Fill Rate (L/hr)')
-    ax2.tick_params(axis='x', which='major', labelsize='x-small')
+    epoch_min_times = np.array(epoch_min_times)
+    xpts = (epoch_min_times[:-1] + epoch_min_times[1:])/2
+    fig.add_trace(go.Scatter(x=pd.to_datetime(xpts, unit='s'),
+                         y=np.diff(mins)/np.diff(epoch_min_times)*3600*12.6,
+                         name = '',
+                         marker = {'color':'red',
+                                   'size':10},
+                         mode='markers',),
+              row=3, col=1,)
 
-    # setup figure with plugins
-    plugins.clear(fig)  # clear all plugins from the figure
-    plugins.connect(fig, plugins.Reset(), plugins.BoxZoom(), plugins.Zoom())
+    fig.update_layout(showlegend=False, margin=dict(l=0,r=0,b=0,t=0))
+    fig.update_yaxes(title_text="MD Level (%)", row=1)
+    fig.update_yaxes(title_text="MD Fill Rate (L/h)", row=2)
+    fig.update_yaxes(title_text="MD Surplus Fill Rate (L/h)", row=3)
+
+    fig.update_traces(xaxis="x3") # unite axes for spikes to be drawn across all. Needs to be the last axis
+
+    fig.update_xaxes(showspikes=True, spikesnap='cursor', spikemode='across',
+                spikecolor="grey", spikethickness=1, spikedash='solid')
+    fig.update_yaxes(showspikes=True, spikedash='solid',spikemode='across',
+                spikecolor="grey",spikesnap="cursor",spikethickness=1)
 
     # save to html
-    mpld3.save_html(fig, 'liquid_prod_rate_fig.html', template_type='simple')
+    fig.write_html('liquid_prod_rate_fig.html')
 
 def rpc_handler(client, cmd, args, max_len):
     """

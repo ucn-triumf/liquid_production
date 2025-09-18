@@ -236,8 +236,14 @@
         <div class="row">
             <div class="column">
                 <div class="inputcol">
-                    This page shows fill rate of the mother dewar (MD) in the periods where FPV211 is closed: we are not drawing liquid from the MD. In this case, the MD is likely to be a closed system, with only the liquifier adding to the level. In this case the fill rate of the MD will be the liquifier production rate.
-                    </br></br></br>
+                    This page shows fill rate of the mother dewar (MD) in the periods the level is increasing: likely no one is drawing liquid from the MD during these times. In this case the fill rate of the MD will be the liquifier production rate.
+                    </br>
+                    <ul>
+                        <li><b>MD Level</b> in percent corresponds to the readback from LVL204</li>
+                        <li>The <b>MD fill rate</b> is the slope of a linear fit to the region where the MD level is increasing. See the colored regions for fitted points.</li>
+                        <li>The <b>MD surplus fill rate</b> is the difference between the minimum points of the linear fits divided by the duration between each minima.</li>
+                    </ul>
+                    This assumes that the conversion from % to L in the MD is 12.6 L/%<br><br>
                     <table>
                         <tr>
                             <td>Start date:</td>
@@ -255,7 +261,7 @@
                             <td><input type="datetime-local" id="tend" onclick="callback_tend();update_times();"></td>
                             <td><label><input type="checkbox" id="tend_now" checked> Now</label></td>
                         </tr>
-                        <tr><td><br><br><br></td></tr>
+                        <tr><td><br><br></td></tr>
                         <tr>
                             <td colspan="3" align="center"><input type="submit" class="button" value="Redraw" style="height:50px; width:200px" onclick="update_figure()"></td>
                         </tr>
