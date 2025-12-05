@@ -14,9 +14,16 @@ from scipy.optimize import curve_fit
 from ucnhistory import ucnhistory
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-# from plotly.io import write_html
 
-from mpld3 import plugins
+def round_times(df):
+    """truncate timestamps to the nearest 10 s"""
+    
+    # truncate epoch times to the nearest 10 s then reset the axis
+    df.epoch_time = df.epoch_time//10*10
+    df['time'] = pd.to_datetime(df.epoch_time, unit='s')
+    df.set_index('time', inplace=True)
+    df = df.tz_localize('UTC').tz_convert('America/Vancouver')
+    return df
 
 def md_fill_rate(t0, t1):
 
@@ -25,13 +32,25 @@ def md_fill_rate(t0, t1):
 
     df = hist.get_data(table='ucn2epicsothers_measured',
                     columns=['ucn2_he4_fpv211_rddacp_measured',
-                                'ucn2_he4_lvl204_rdlvl_measured'],
+                             'ucn2_he4_lvl204_rdlvl_measured'],
                     start = t0,
                     stop = t1)
+    df = round_times(df)
+    
+    # get flow data
+    df2 = hist.get_data(table='ucn2pur_measured', 
+                                 columns=['ucn2_he4_fm210_rdflow_measured'],
+                                 start=t0,
+                                 stop=t1)
+    df2 = round_times(df2)
+
+    df = pd.concat((df, df2['ucn2_he4_fm210_rdflow_measured']),
+                    axis='columns')
 
     df.rename(columns={'ucn2_he4_fpv211_rddacp_measured':'fpv211',
-                    'ucn2_he4_lvl204_rdlvl_measured':'lvl204'},
-            inplace=True)
+                       'ucn2_he4_lvl204_rdlvl_measured':'lvl204',
+                       'ucn2_he4_fm210_rdflow_measured':'fm210'},
+              inplace=True)
 
     df_orig = df.copy()
 
@@ -59,11 +78,13 @@ def md_fill_rate(t0, t1):
     # save results
     rates = []          # fill rate
     drates = []         # error in fill rate
+    return_flows = []   # avg return flows FM210
+    dreturn_flows = []  # error in avg return flows FM210
     times_center = []   # center time in datetime
     mins = []           # minimum values for each period
     epoch_min_times = []   # center time in epoch time
 
-    fig = make_subplots(rows=3, cols=1,
+    fig = make_subplots(rows=4, cols=1,
                     shared_xaxes=True,
                     vertical_spacing=0.02)
 
@@ -129,7 +150,11 @@ def md_fill_rate(t0, t1):
         epoch_min_times.append(min(df1.index))
         mins.append(fn(min(x), *par))
 
-    # plotly drawing
+        # get average flows
+        return_flows.append(df1.fm210.mean())
+        dreturn_flows.append(df1.fm210.std())
+
+    # plotly drawing - rates
     fig.add_trace(go.Scatter(x=times_center,
                          y=rates,
                          error_y = {'type':'data', 'array':drates, 'visible':True, 'width':0},
@@ -139,6 +164,7 @@ def md_fill_rate(t0, t1):
                          mode='markers',),
                 row=2, col=1,)
 
+    # plotly drawing - surplus rates
     epoch_min_times = np.array(epoch_min_times)
     xpts = (epoch_min_times[:-1] + epoch_min_times[1:])/2
     fig.add_trace(go.Scatter(x=pd.to_datetime(xpts, unit='s'),
@@ -148,13 +174,24 @@ def md_fill_rate(t0, t1):
                                    'size':10},
                          mode='markers',),
               row=3, col=1,)
+    
+    # plotly drawing - flows
+    fig.add_trace(go.Scatter(x=times_center,
+                         y=return_flows,
+                         error_y = {'type':'data', 'array':dreturn_flows, 'visible':True, 'width':0},
+                         name = '',
+                         marker = {'color':'black',
+                                   'size':10},
+                         mode='markers',),
+                row=4, col=1,)
 
     fig.update_layout(showlegend=False, margin=dict(l=0,r=0,b=0,t=0))
     fig.update_yaxes(title_text="MD Level (%)", row=1)
     fig.update_yaxes(title_text="MD Fill Rate (L/h)", row=2)
     fig.update_yaxes(title_text="MD Surplus Fill Rate (L/h)", row=3)
+    fig.update_yaxes(title_text="Average Return Flow (SLM)", row=4)
 
-    fig.update_traces(xaxis="x3") # unite axes for spikes to be drawn across all. Needs to be the last axis
+    fig.update_traces(xaxis="x4") # unite axes for spikes to be drawn across all. Needs to be the last axis
 
     fig.update_xaxes(showspikes=True, spikesnap='cursor', spikemode='across',
                 spikecolor="grey", spikethickness=1, spikedash='solid')
@@ -162,7 +199,15 @@ def md_fill_rate(t0, t1):
                 spikecolor="grey",spikesnap="cursor",spikethickness=1)
 
     # save to html
-    fig.write_html('liquid_prod_rate_fig.html')
+    fig.write_html('liquid_prod_rate_fig.html',
+                    config={'modeBarButtonsToRemove': ['zoomIn',
+                                                       'zoomOut',
+                                                       'autoScale',
+                                                       'select',
+                                                       'lasso2d'],
+                            'modeBarButtonsToAdd': ['drawopenpath'],
+                            'displaylogo': False
+                            })
 
 def rpc_handler(client, cmd, args, max_len):
     """

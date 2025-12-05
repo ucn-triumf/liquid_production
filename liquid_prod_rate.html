@@ -76,24 +76,24 @@
     <script>
 
         function parse_rpc_response(rpc_result) {
-        // Convert an RPC result into a status code and message string.
-        // In the python code we specify a flag that means the main
-        // rpc_result.status is always 1 if the python code ran, and the
-        // "real" status code is embedded in the reply string.
-        //
-        // See the notes in midas.client.MidasClient.register_jrpc_callback()
-        // for the rationale.
-        let status = rpc_result.status;
-        let reply = "";
+            // Convert an RPC result into a status code and message string.
+            // In the python code we specify a flag that means the main
+            // rpc_result.status is always 1 if the python code ran, and the
+            // "real" status code is embedded in the reply string.
+            //
+            // See the notes in midas.client.MidasClient.register_jrpc_callback()
+            // for the rationale.
+            let status = rpc_result.status;
+            let reply = "";
 
-        if (status == 1) {
-            // Only get a reply from mjsonrpc if status is 1
-            let parsed = JSON.parse(rpc_result.reply);
-            status = parsed["code"];
-            reply = parsed["msg"];
-        }
+            if (status == 1) {
+                // Only get a reply from mjsonrpc if status is 1
+                let parsed = JSON.parse(rpc_result.reply);
+                status = parsed["code"];
+                reply = parsed["msg"];
+            }
 
-        return [status, reply];
+            return [status, reply];
         }
 
         function alert_rpc_error(status, reply) {
