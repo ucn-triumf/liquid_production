@@ -20,6 +20,7 @@ def round_times(df):
     
     # truncate epoch times to the nearest 10 s then reset the axis
     df.epoch_time = df.epoch_time//10*10
+    df.drop_duplicates('epoch_time', inplace=True)
     df['time'] = pd.to_datetime(df.epoch_time, unit='s')
     df.set_index('time', inplace=True)
     df = df.tz_localize('UTC').tz_convert('America/Vancouver')
@@ -43,7 +44,7 @@ def md_fill_rate(t0, t1):
                                  start=t0,
                                  stop=t1)
     df2 = round_times(df2)
-
+  
     df = pd.concat((df, df2['ucn2_he4_fm210_rdflow_measured']),
                     axis='columns')
 
@@ -105,7 +106,7 @@ def md_fill_rate(t0, t1):
         df1 = df1.iloc[1:-1]
 
         # trim start and end times
-        idx = (df1.index > df1.index.min()+100) & (df1.index < df1.index.max()-300)
+        idx = (df1.index > df1.index.min()+120) & (df1.index < df1.index.max()-300)
         df1 = df1.loc[idx]
 
         # needs a decently long set of data to fit
@@ -114,6 +115,11 @@ def md_fill_rate(t0, t1):
 
         t0 = min(df1.index)
         x = df1.index.values - t0
+
+        # get average flows
+        idx = df1.index > df1.index.min()+(13*60) # takes a while for the flow to drop
+        return_flows.append(df1.loc[idx, 'fm210'].mean())
+        dreturn_flows.append(df1.loc[idx, 'fm210'].std())
 
         # fit with linear line
         try:
@@ -150,9 +156,6 @@ def md_fill_rate(t0, t1):
         epoch_min_times.append(min(df1.index))
         mins.append(fn(min(x), *par))
 
-        # get average flows
-        return_flows.append(df1.fm210.mean())
-        dreturn_flows.append(df1.fm210.std())
 
     # plotly drawing - rates
     fig.add_trace(go.Scatter(x=times_center,
