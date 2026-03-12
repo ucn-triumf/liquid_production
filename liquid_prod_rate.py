@@ -7,7 +7,7 @@
 import pandas as pd
 import datetime
 import numpy as np
-import json, demjson
+import json
 import midas
 import midas.client
 from scipy.optimize import curve_fit
