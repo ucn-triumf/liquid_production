@@ -55,6 +55,15 @@
             color: white;
         }
 
+        .button:disabled {
+            border: 2px solid #a3a3a3;
+            color: #a3a3a3;
+        }
+
+        .button:hover:disabled {
+            background-color: #a3a3a3;
+        }
+
         @media screen and (max-width: 1000px) {
            .column {
                 width: 100%;
@@ -120,6 +129,18 @@
                 return;
             }
 
+            // disable buttons
+            for(link of document.getElementsByClassName("dl_link")){
+                link.setAttribute('disabled', '');
+            }
+            for(button of document.getElementsByClassName("button")){
+
+                // don't disable redraw button
+                if(button.value != "Redraw"){
+                    button.setAttribute('disabled', '');
+                }
+            }
+
             // make an object to store the things to communicate to the python client
             let params = Object();
             params.client_name = "liquidprod";  // must match client name in python client
@@ -136,6 +157,7 @@
             if (status != 1) {
                 document.getElementById("figure_space").innerHTML = '';
                 alert_rpc_error(status, reply);
+                return;
             }
             
             // make calls to check if figure generation has finished
@@ -158,10 +180,17 @@
                     document.getElementById("last_updated").innerHTML = `Figure last updated on ${jreply["last"]}`;
                     
                 } else {
-                    console.log('Awaiting draw finished flag')
                     document.getElementById("last_updated").innerHTML = `Waiting for figure generation ${jreply["last"]}`;
                     await sleep(500);
                 }
+            }
+
+            // set buttons to enabled
+            for(link of document.getElementsByClassName("dl_link")){
+                link.removeAttribute('disabled');
+            }
+            for(button of document.getElementsByClassName("button")){
+                button.removeAttribute('disabled');
             }
         }
 
@@ -235,7 +264,7 @@
         function callback_tend(){
             // unclick click Now checkbox when the end date is changed
             document.getElementById("tend_now").checked = false;
-        }
+        }   
     </script>
 
 </head>
@@ -283,6 +312,36 @@
                             <td colspan="3" align="center"><input type="submit" class="button" value="Redraw" style="height:50px; line-height:0px; width:200px" onclick="update_figure()"></td>
                         </tr>
                     </table>
+                </div>
+                <div>
+                    <h2>Downloads</h2>
+                    <table>
+                        <tr>
+                            <td>
+                                <a class="dl_link" href="liquid_production/levels.csv" download disabled>
+                                    <input type="button" class="button" style="width:300px" value="MD Level (%)" disabled>
+                                </a>
+                            </td>
+                            <td>
+                                <a class="dl_link" href="liquid_production/surplus.csv" download disabled>
+                                    <input type="button" class="button" style="width:300px" value="MD Surplus Fill Rate (L/h)" disabled>
+                                </a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <a class="dl_link" href="liquid_production/rates.csv" download disabled>
+                                    <input type="button" class="button" style="width:300px" value="MD Fill Rate (L/h)" disabled>
+                                </a>
+                            </td>
+                            <td>
+                                <a class="dl_link" href="liquid_production/flows.csv" download disabled>
+                                    <input type="button" class="button" style="width:300px" value="Average Return Flow (SLM)" disabled>
+                                </a>
+                            </td>
+                        </tr>
+                    </table>
+
                 </div>
             </div>
             <div class="column">
