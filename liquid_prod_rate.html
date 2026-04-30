@@ -1,4 +1,4 @@
-        <!DOCTYPE html>
+<!DOCTYPE html>
 <html class="mcss" lang="en">
 <head>
    <meta charset="UTF-8">
@@ -106,14 +106,14 @@
             }
         }
 
-        function update_figure() {
+        async function update_figure() {
             // Update the figure
 
             // get input parameters
             let jargs = {'start': document.getElementById("tstart").value,
                          'end': document.getElementById("tend").value,
                         };
-
+            
             // check start and end times
             if(new Date(jargs['end']).getTime() <= new Date(jargs['start']).getTime()){
                 alert("Start time must be less than the end time");
@@ -130,29 +130,45 @@
             document.getElementById("figure_space").innerHTML = "<div class='loader'></div>";
             document.getElementById("last_updated").innerHTML = '';
 
-            // make a call to the python client to generate the figure
-            mjsonrpc_call("jrpc", params).then(function(rpc) {
-                let [status, reply] = parse_rpc_response(rpc.result);
-                if (status == 1) {
-                    console.log('Generated figure successfully');
-                    let jreply = JSON.parse(reply);
+            // make a call to the python client to start generating the figure
+            rpc = await mjsonrpc_call("jrpc", params)
+            var [status, reply] = parse_rpc_response(rpc.result);
+            if (status != 1) {
+                document.getElementById("figure_space").innerHTML = '';
+                alert_rpc_error(status, reply);
+            }
+            
+            // make calls to check if figure generation has finished
+            params.client_name = "liquidprod";  // must match client name in python client
+            params.cmd = "draw_finished?";      // command to run
+            params.args = "";                   // arguments, must be a string
 
-                    // insert figure into webpage
+            status = 0;
+            while(!status){
+                let rpc = await mjsonrpc_call("jrpc", params);
+                [status, reply] = parse_rpc_response(rpc.result);
+                let jreply = JSON.parse(reply);
+                
+                // insert figure into webpage
+                if (status == 1) {
                     let src = 'liquid_production/liquid_prod_rate_fig.html?random='+new Date().getTime()
                     document.getElementById("figure_space").innerHTML = `<iframe id='rates_figure' src='${src}' height=825px width=825px border=0></iframe>`;
-
+    
                     // last updated string
                     document.getElementById("last_updated").innerHTML = `Figure last updated on ${jreply["last"]}`;
-
+                    
                 } else {
-                    document.getElementById("figure_space").innerHTML = '';
-                    alert_rpc_error(status, reply);
+                    console.log('Awaiting draw finished flag')
+                    document.getElementById("last_updated").innerHTML = `Waiting for figure generation ${jreply["last"]}`;
+                    await sleep(500);
                 }
-            }).catch(function(error) {
-                mjsonrpc_error_alert(error);
-            });
+            }
         }
 
+        function sleep(time) {
+            return new Promise((resolve) => setTimeout(resolve, time));
+        }
+        
         function update_times(){
             // update string for times
 
@@ -264,7 +280,7 @@
                         </tr>
                         <tr><td><br><br></td></tr>
                         <tr>
-                            <td colspan="3" align="center"><input type="submit" class="button" value="Redraw" style="height:50px; width:200px" onclick="update_figure()"></td>
+                            <td colspan="3" align="center"><input type="submit" class="button" value="Redraw" style="height:50px; line-height:0px; width:200px" onclick="update_figure()"></td>
                         </tr>
                     </table>
                 </div>

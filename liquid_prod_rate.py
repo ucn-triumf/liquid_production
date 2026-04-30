@@ -12,8 +12,23 @@ import midas
 import midas.client
 from scipy.optimize import curve_fit
 from ucnhistory import ucnhistory
+import threading, time
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+
+class FigureDrawer(object):
+
+    def start_draw(self, t0, t1):
+        self.th = threading.Thread(target=md_fill_rate, args = (t0, t1))
+        self.th.start()
+
+    def is_alive(self):
+        try:
+            return self.th.is_alive()
+        except AttributeError:
+            return False
+
+figure = FigureDrawer()
 
 def round_times(df):
     """truncate timestamps to the nearest 10 s"""
@@ -211,7 +226,7 @@ def md_fill_rate(t0, t1):
                             'modeBarButtonsToAdd': ['drawopenpath'],
                             'displaylogo': False
                             })
-
+    
 def rpc_handler(client, cmd, args, max_len):
     """
     This is the function that will be called when something/someone
@@ -243,16 +258,24 @@ def rpc_handler(client, cmd, args, max_len):
         t0 = datetime.datetime.strptime(t0, '%Y-%m-%dT%H:%M')
         t1 = datetime.datetime.strptime(t1, '%Y-%m-%dT%H:%M')
 
-        md_fill_rate(t0, t1)
+        # generate figure
+        figure.start_draw(t0, t1)
 
         # output
         ret_int = midas.status_codes["SUCCESS"]
         ret_str = json.dumps({"last": str(datetime.datetime.now())})
+
+    elif cmd== "draw_finished?":
+        ret_int = int(not figure.is_alive())
+        ret_str = json.dumps({"last": str(datetime.datetime.now())})
+    
     else:
         ret_int = midas.status_codes["FE_ERR_DRIVER"]
         ret_str = "Unknown command '%s'" % cmd
 
     return (ret_int, ret_str)
+
+
 
 if __name__ == "__main__":
     client = midas.client.MidasClient("liquidprod")
